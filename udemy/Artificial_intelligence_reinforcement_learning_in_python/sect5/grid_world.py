@@ -1,9 +1,7 @@
 # https://deeplearningcourses.com/c/artificial-intelligence-reinforcement-learning-in-python
 # https://www.udemy.com/artificial-intelligence-reinforcement-learning-in-python
-from __future__ import print_function, division
+from __future__ import print_function, division, annotations
 from builtins import range
-# Note: you may need to update your version of future
-# sudo pip install -U future
 
 import dataclasses
 import enum
@@ -12,9 +10,15 @@ import random
 
 
 @dataclasses.dataclass
-class GridPos:
+class GridState:
   i: int
   j: int
+
+  def copy(self) -> GridState:
+    return GridState(i=self.i, j=self.j)
+
+  def __hash__(self):
+    return hash((self.i, self.j))
 
 
 class GridAction(enum.Enum):
@@ -28,12 +32,11 @@ ACTION_SPACE = ('U', 'D', 'L', 'R')
 
 
 class Grid: # Environment
-  def __init__(self, rows: int, cols: int, start: GridPos):
+  def __init__(self, rows: int, cols: int, init_state: GridState):
     self.rows = rows
     self.cols = cols
-    self._start = start
-    self.i = self._start.i
-    self.j = self._start.j
+    self._begin_state = init_state
+    self.state = self._begin_state.copy()
 
   def set(self, rewards, actions):
     # rewards should be a dict of: (i, j): r (row, col): reward
@@ -41,64 +44,55 @@ class Grid: # Environment
     self.rewards = rewards
     self.actions = actions
 
-  def set_state(self, s):
-    self.i = s[0]
-    self.j = s[1]
+  def set_state(self, s: GridState):
+    self.state = s
 
   @property
-  def current_state(self):
-    return (self.i, self.j)
+  def current_state(self) -> GridState:
+    return self.state
 
-  def is_terminal(self, s):
+  def is_terminal(self, s: GridState):
     return s not in self.actions
 
-  def reset(self):
+  def reset(self) -> GridState:
     # put agent back in start position
-    self.i = 2
-    self.j = 0
-    return (self.i, self.j)
+    self.state = self._begin_state.copy()
+    return self.state
 
-  def get_next_state(self, s, a):
-    # this answers: where would I end up if I perform action 'a' in state 's'?
-    i, j = s[0], s[1]
-
+  def get_next_state(self, s: GridState, a) -> GridState:
     # if this action moves you somewhere else, then it will be in this dictionary
-    if a in self.actions[(i, j)]:
+    next_state = s.copy()
+    if a in self.actions[s]:
       if a == 'U':
-        i -= 1
+        next_state.i -= 1
       elif a == 'D':
-        i += 1
+        next_state.i += 1
       elif a == 'R':
-        j += 1
+        next_state.j += 1
       elif a == 'L':
-        j -= 1
-    # else:
-    #   raise Exception(f'Unexpected action={a} at state={s}!')
+        next_state.j -= 1
 
-    return i, j
+    return next_state
 
-  def random_move(self):
+  def random_move(self) -> float:
     # Take random move at current state
     next_action = random.choice(self.actions[self.current_state])
     return self.move(next_action)
 
-  def move(self, action):
+  def move(self, action) -> float:
     # check if legal move first
-    if action in self.actions[(self.i, self.j)]:
+    if action in self.actions[self.state]:
       if action == 'U':
-        self.i -= 1
+        self.state.i -= 1
       elif action == 'D':
-        self.i += 1
+        self.state.i += 1
       elif action == 'R':
-        self.j += 1
+        self.state.j += 1
       elif action == 'L':
-        self.j -= 1
-    # else:
-    #   raise Exception(
-    #       f'Unexpected action={action} at state={self.current_state}!')
+        self.state.j -= 1
 
     # return a reward (if any)
-    return self.rewards.get((self.i, self.j), 0)
+    return self.rewards.get(self.state, 0)
 
   def undo_move(self, action):
     # these are the opposite of what U/D/L/R should normally do
@@ -112,12 +106,12 @@ class Grid: # Environment
       self.j += 1
     # raise an exception if we arrive somewhere we shouldn't be
     # should never happen
-    assert(self.current_state() in self.all_states())
+    assert(self.current_state in self.all_states())
 
-  def game_over(self):
+  def game_over(self) -> bool:
     # returns true if game is over, else false
     # true if we are in a state where no actions are possible
-    return (self.i, self.j) not in self.actions
+    return self.state not in self.actions
 
   def all_states(self):
     # possibly buggy but simple way to get all states
@@ -136,18 +130,18 @@ def standard_grid():
   # .  .  .  1
   # .  x  . -1
   # s  .  .  .
-  g = Grid(3, 4, GridPos(i=2, j=0))
-  rewards = {(0, 3): 1, (1, 3): -1}
+  g = Grid(3, 4, GridState(i=2, j=0))
+  rewards = {GridState(i=0, j=3): 1, GridState(i=1, j=3): -1}
   actions = {
-    (0, 0): ('D', 'R'),
-    (0, 1): ('L', 'R'),
-    (0, 2): ('L', 'D', 'R'),
-    (1, 0): ('U', 'D'),
-    (1, 2): ('U', 'D', 'R'),
-    (2, 0): ('U', 'R'),
-    (2, 1): ('L', 'R'),
-    (2, 2): ('L', 'R', 'U'),
-    (2, 3): ('L', 'U'),
+    GridState(0, 0): ('D', 'R'),
+    GridState(0, 1): ('L', 'R'),
+    GridState(0, 2): ('L', 'D', 'R'),
+    GridState(1, 0): ('U', 'D'),
+    GridState(1, 2): ('U', 'D', 'R'),
+    GridState(2, 0): ('U', 'R'),
+    GridState(2, 1): ('L', 'R'),
+    GridState(2, 2): ('L', 'R', 'U'),
+    GridState(2, 3): ('L', 'U'),
   }
   g.set(rewards, actions)
   return g
@@ -343,28 +337,28 @@ def windy_grid_penalized(step_cost=-0.1):
 
 def grid_5x5(step_cost=-0.1):
   g = Grid(5, 5, (4, 0))
-  rewards = {(0, 4): 1, (1, 4): -1}
+  rewards = {GridState(0, 4): 1, GridState(1, 4): -1}
   actions = {
-    (0, 0): ('D', 'R'),
-    (0, 1): ('L', 'R'),
-    (0, 2): ('L', 'R'),
-    (0, 3): ('L', 'D', 'R'),
-    (1, 0): ('U', 'D', 'R'),
-    (1, 1): ('U', 'D', 'L'),
-    (1, 3): ('U', 'D', 'R'),
-    (2, 0): ('U', 'D', 'R'),
-    (2, 1): ('U', 'L', 'R'),
-    (2, 2): ('L', 'R', 'D'),
-    (2, 3): ('L', 'R', 'U'),
-    (2, 4): ('L', 'U', 'D'),
-    (3, 0): ('U', 'D'),
-    (3, 2): ('U', 'D'),
-    (3, 4): ('U', 'D'),
-    (4, 0): ('U', 'R'),
-    (4, 1): ('L', 'R'),
-    (4, 2): ('L', 'R', 'U'),
-    (4, 3): ('L', 'R'),
-    (4, 4): ('L', 'U'),
+    GridState(0, 0): ('D', 'R'),
+    GridState(0, 1): ('L', 'R'),
+    GridState(0, 2): ('L', 'R'),
+    GridState(0, 3): ('L', 'D', 'R'),
+    GridState(1, 0): ('U', 'D', 'R'),
+    GridState(1, 1): ('U', 'D', 'L'),
+    GridState(1, 3): ('U', 'D', 'R'),
+    GridState(2, 0): ('U', 'D', 'R'),
+    GridState(2, 1): ('U', 'L', 'R'),
+    GridState(2, 2): ('L', 'R', 'D'),
+    GridState(2, 3): ('L', 'R', 'U'),
+    GridState(2, 4): ('L', 'U', 'D'),
+    GridState(3, 0): ('U', 'D'),
+    GridState(3, 2): ('U', 'D'),
+    GridState(3, 4): ('U', 'D'),
+    GridState(4, 0): ('U', 'R'),
+    GridState(4, 1): ('L', 'R'),
+    GridState(4, 2): ('L', 'R', 'U'),
+    GridState(4, 3): ('L', 'R'),
+    GridState(4, 4): ('L', 'U'),
   }
   g.set(rewards, actions)
 
@@ -373,4 +367,4 @@ def grid_5x5(step_cost=-0.1):
   for s in visitable_states:
     g.rewards[s] = step_cost
 
-  return 
+  ieturn 

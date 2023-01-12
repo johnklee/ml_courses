@@ -8,7 +8,7 @@ from builtins import range
 
 
 import numpy as np
-from grid_world import standard_grid, ACTION_SPACE
+from grid_world import standard_grid, ACTION_SPACE, GridState
 
 SMALL_ENOUGH = 1e-3 # threshold for convergence
 
@@ -17,7 +17,7 @@ def print_values(V, g):
   for i in range(g.rows):
     print("---------------------------")
     for j in range(g.cols):
-      v = V.get((i,j), 0)
+      v = V.get(GridState(i,j), 0)
       if v >= 0:
         print(" %.2f|" % v, end="")
       else:
@@ -52,25 +52,26 @@ if __name__ == '__main__':
   grid = standard_grid()
   for i in range(grid.rows):
     for j in range(grid.cols):
-      s = (i, j)
+      s = GridState(i, j)
       if not grid.is_terminal(s):
         for a in ACTION_SPACE:
           s2 = grid.get_next_state(s, a)
+          print(f'Action={a}: {s} -> {s2} ({grid.rewards.get(s2, 0)})')
           transition_probs[(s, a, s2)] = 1
           if s2 in grid.rewards:
             rewards[(s, a, s2)] = grid.rewards[s2]
 
   ### fixed policy ###
   policy = {
-    (2, 0): 'U',
-    (1, 0): 'U',
-    (0, 0): 'R',
-    (0, 1): 'R',
-    (0, 2): 'R',
-    (1, 2): 'U',
-    (2, 1): 'R',
-    (2, 2): 'U',
-    (2, 3): 'L',
+    GridState(2, 0): 'U',
+    GridState(1, 0): 'U',
+    GridState(0, 0): 'R',
+    GridState(0, 1): 'R',
+    GridState(0, 2): 'R',
+    GridState(1, 2): 'U',
+    GridState(2, 1): 'R',
+    GridState(2, 2): 'U',
+    GridState(2, 3): 'L',
   }
   print_policy(policy, grid)
 
@@ -109,4 +110,5 @@ if __name__ == '__main__':
 
     if biggest_change < SMALL_ENOUGH:
       break
+
   print("\n\n")
